@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>الجوائز الفردية - بطولة كأس منصور بن زايد 2026</title>
+
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b1f3a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="كأس منصور">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+
+  <style>
+    .awards-page{
+      min-height: 100vh;
+      padding: 28px 18px 40px;
+      box-sizing: border-box;
+    }
+
+    .awards-shell{
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+
+    .awards-head{
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .awards-title{
+      color: #fff;
+      font-size: 2rem;
+      font-weight: 800;
+      margin: 0 0 10px;
+      text-shadow: 0 2px 12px rgba(0,0,0,.35);
+    }
+
+    .awards-subtitle{
+      color: rgba(255,255,255,.82);
+      font-size: 1rem;
+      margin: 0;
+    }
+
+    .awards-frame{
+      position: relative;
+      border-radius: 22px;
+      overflow: hidden;
+      padding: 18px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+        radial-gradient(circle at top right, rgba(215,171,63,.18), transparent 28%),
+        radial-gradient(circle at top left, rgba(255,255,255,.08), transparent 22%);
+      box-shadow:
+        0 16px 50px rgba(0,0,0,.35),
+        inset 0 0 0 1px rgba(255,255,255,.08);
+      backdrop-filter: blur(4px);
+    }
+
+    .awards-glow{
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(255,255,255,.08), transparent 35%),
+        radial-gradient(circle at 100% 0%, rgba(215,171,63,.10), transparent 25%),
+        radial-gradient(circle at 0% 100%, rgba(255,255,255,.05), transparent 20%);
+    }
+
+    .awards-image-wrap{
+      position: relative;
+      border-radius: 18px;
+      overflow: hidden;
+      background: rgba(255,255,255,.02);
+    }
+
+    .awards-image{
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 18px;
+      cursor: zoom-in;
+      transition: transform .25s ease, box-shadow .25s ease;
+      box-shadow: 0 18px 44px rgba(0,0,0,.32);
+    }
+
+    .awards-image:hover{
+      transform: scale(1.01);
+      box-shadow: 0 24px 56px rgba(0,0,0,.4);
+    }
+
+    .awards-note{
+      text-align: center;
+      margin-top: 16px;
+      color: rgba(255,255,255,.78);
+      font-size: .95rem;
+    }
+
+    .popup{
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 10, 22, .94);
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      padding: 24px;
+      box-sizing: border-box;
+      cursor: zoom-out;
+    }
+
+    .popup-content{
+      position: relative;
+      max-width: 96vw;
+      max-height: 94vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .popup img{
+      display: block;
+      max-width: 96vw;
+      max-height: 94vh;
+      width: auto;
+      height: auto;
+      border-radius: 14px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.6);
+      background: #111;
+    }
+
+    .popup-close{
+      position: absolute;
+      top: -10px;
+      left: -10px;
+      width: 42px;
+      height: 42px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+      font-size: 24px;
+      line-height: 42px;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(0,0,0,.28);
+    }
+
+    .popup-close:hover{
+      background: rgba(255,255,255,.22);
+    }
+
+    @media (max-width: 900px){
+      .awards-title{
+        font-size: 1.55rem;
+      }
+
+      .awards-page{
+        padding: 18px 10px 28px;
+      }
+
+      .awards-frame{
+        padding: 10px;
+        border-radius: 16px;
+      }
+
+      .awards-image,
+      .awards-image-wrap{
+        border-radius: 12px;
+      }
+
+      .popup{
+        padding: 10px;
+      }
+
+      .popup-close{
+        top: 8px;
+        left: 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <h1 class="site-title">بطولة كأس منصور بن زايد 2026</h1>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-link" href="index.html">الرئيسية</a>
+      <a class="nav-link" href="group.html?g=A">المجموعة A</a>
+      <a class="nav-link" href="group.html?g=B">المجموعة B</a>
+      <a class="nav-link" href="group.html?g=C">المجموعة C</a>
+      <a class="nav-link" href="group.html?g=D">المجموعة D</a>
+      <a class="nav-link" href="groups_all.html">ترتيب جميع المجموعات</a>
+      <a class="nav-link" href="awards.html">الجوائز الفردية</a>
+      <a class="nav-link" href="stats.html">الإحصائيات</a>
+      <a class="nav-link" href="knockout.html">الأدوار النهائية</a>
+    </nav>
+  </header>
+
+  <main class="awards-page">
+    <div class="awards-shell">
+      <div class="awards-head">
+        <h2 class="awards-title">الجوائز الفردية – بطولة كأس منصور بن زايد 2026</h2>
+        <p class="awards-subtitle">اضغط على الصورة لعرضها بالحجم الكامل</p>
+      </div>
+
+      <section class="awards-frame">
+        <div class="awards-glow"></div>
+
+        <div class="awards-image-wrap">
+          <img
+            src="assets/img/awards2026.jpg"
+            alt="الجوائز الفردية لبطولة كأس منصور بن زايد 2026"
+            class="awards-image"
+            onclick="openPopup()"
+          />
+        </div>
+
+        <div class="awards-note">
+          صفحة الجوائز النهائية الثابتة للموسم 2026
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="popup" id="popup" onclick="closePopup(event)">
+    <div class="popup-content" onclick="event.stopPropagation()">
+      <button class="popup-close" type="button" aria-label="إغلاق" onclick="closePopup(event)">×</button>
+      <img
+        src="assets/img/awards2026.jpg"
+        alt="الجوائز الفردية لبطولة كأس منصور بن زايد 2026 بالحجم الكامل"
+      />
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-inner">© بطولة كأس منصور بن زايد 2026</div>
+  </footer>
+
+  <script>
+    function openPopup(){
+      const popup = document.getElementById("popup");
+      if (popup) popup.style.display = "flex";
+      document.body.style.overflow = "hidden";
+    }
+
+    function closePopup(event){
+      if (event) event.stopPropagation();
+      const popup = document.getElementById("popup");
+      if (popup) popup.style.display = "none";
+      document.body.style.overflow = "";
+    }
+
+    document.addEventListener("keydown", function(e){
+      if(e.key === "Escape"){
+        closePopup();
+      }
+    });
+  </script>
+</body>
+</html>

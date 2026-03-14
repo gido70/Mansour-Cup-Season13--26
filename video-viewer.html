@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>مشاهدة الفيديو</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    body{background:radial-gradient(circle at top, #0f2b55, #06172d 55%, #041120);color:#fff;margin:0}
+    .viewer-wrap{max-width:1200px;margin:0 auto;padding:16px 12px 24px}
+    .viewer-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .title-wrap{flex:1 1 auto;text-align:center}
+    .title-wrap h1{margin:0 0 6px;font-size:1.8rem}
+    .title-wrap p{margin:0;color:rgba(255,255,255,.85)}
+    .back-home,.open-direct{display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:14px;background:linear-gradient(180deg,#184786,#113464);color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.15);font-weight:800}
+    .viewer-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.2);padding:12px}
+    .video-box{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden}
+    .video-box iframe,.video-box video{width:100%;height:100%;border:none;display:block}
+    .fallback{padding:14px;text-align:center;color:rgba(255,255,255,.86)}
+    @media (max-width:640px){
+      .viewer-wrap{padding:12px 8px 20px}
+      .viewer-top{position:sticky;top:0;background:linear-gradient(180deg, rgba(6,23,45,.97), rgba(6,23,45,.9));backdrop-filter:blur(8px);padding:8px 0 10px;z-index:10}
+      .title-wrap h1{font-size:1.2rem}
+      .title-wrap p{font-size:.88rem}
+      .back-home,.open-direct{width:100%;min-height:44px;font-size:.95rem}
+    }
+  </style>
+</head>
+<body>
+  <main class="viewer-wrap">
+    <div class="viewer-top">
+      <a href="index.html" class="back-home">الرجوع إلى الصفحة الرئيسية</a>
+      <div class="title-wrap">
+        <h1 id="pageTitle">مشاهدة الفيديو</h1>
+        <p>مشاهدة الفيديو داخل الصفحة أو فتحه مباشرة.</p>
+      </div>
+      <a id="openDirect" href="#" class="open-direct" target="_blank" rel="noopener">فتح الفيديو مباشرة</a>
+    </div>
+
+    <section class="viewer-card">
+      <div class="video-box" id="videoBox"></div>
+      <div class="fallback">إذا لم يعمل المشغل داخل الصفحة، استخدم زر <strong>فتح الفيديو مباشرة</strong>.</div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const type = params.get('type') || 'mp4';
+    const src = params.get('src') || '';
+    const title = params.get('title') || 'مشاهدة الفيديو';
+    document.getElementById('pageTitle').textContent = decodeURIComponent(title);
+    document.getElementById('openDirect').href = src;
+
+    function youtubeEmbed(url){
+      try{
+        const u = new URL(url);
+        let id = '';
+        if(u.hostname.includes('youtu.be')) id = u.pathname.replace('/','');
+        else if(u.searchParams.get('v')) id = u.searchParams.get('v');
+        return 'https://www.youtube.com/embed/' + id;
+      }catch(e){ return url; }
+    }
+
+    const box = document.getElementById('videoBox');
+    if(type === 'youtube'){
+      const iframe = document.createElement('iframe');
+      iframe.src = youtubeEmbed(src);
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+      iframe.allowFullscreen = true;
+      box.appendChild(iframe);
+    }else{
+      const video = document.createElement('video');
+      video.src = src;
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      box.appendChild(video);
+    }
+  </script>
+</body>
+</html>
