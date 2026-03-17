@@ -1,100 +1,22 @@
-const CupApp = (function(){
-  "use strict";
+/* Mansour Cup 2026 - Robust CSV-driven front-end (no external libs) */
+const CupApp = (() => {
 
-  const MATCHES_CSV = "matches.csv";
-  const STANDINGS_CSV = "data/standings.csv";
-  const STATS_CSV = "data/stats.csv";
-  const TEAMS_CSV = "data/teams.csv";
-  const PLAYERS_CSV = "data/players.csv";
-  const NEWS_CSV = "data/news.csv";
-  const AWARDS_JSON = "awards.json";
-  const STAFF_JSON = "staff.json";
+  function qs(sel){ return document.querySelector(sel); }
+  function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
 
-  function $(sel, root=document){ return root.querySelector(sel); }
-  function $all(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
-
-  async function fetchText(url){
-    const res = await fetch(url, { cache: "no-store" });
-    if(!res.ok) throw new Error(`Fetch failed: ${url}`);
-    return await res.text();
+  function getParam(name){
+    const url = new URL(window.location.href);
+    return url.searchParams.get(name) || "";
   }
 
-  function csvToRows(csv){
-    const rows = [];
-    let row = [];
-    let cur = "";
-    let i = 0;
-    let inQuotes = false;
-
-    while(i < csv.length){
-      const ch = csv[i];
-
-      if(inQuotes){
-        if(ch === '"'){
-          if(csv[i+1] === '"'){
-            cur += '"';
-            i += 2;
-            continue;
-          }
-          inQuotes = false;
-          i++;
-          continue;
-        }
-        cur += ch;
-        i++;
-        continue;
-      }
-
-      if(ch === '"'){
-        inQuotes = true;
-        i++;
-        continue;
-      }
-
-      if(ch === ","){
-        row.push(cur);
-        cur = "";
-        i++;
-        continue;
-      }
-
-      if(ch === "\n"){
-        row.push(cur);
-        rows.push(row);
-        row = [];
-        cur = "";
-        i++;
-        continue;
-      }
-
-      if(ch === "\r"){
-        i++;
-        continue;
-      }
-
-      cur += ch;
-      i++;
-    }
-
-    if(cur.length || row.length){
-      row.push(cur);
-      rows.push(row);
-    }
-
-    return rows;
+  function showError(msg){
+    const el = qs('#loadError');
+    if(!el) return;
+    el.textContent = msg;
+    el.classList.remove('hidden');
   }
 
-  function parseCSV(csv){
-    const rows = csvToRows(csv);
-    if(!rows.length) return [];
-    const headers = rows[0].map(h => h.trim());
-    return rows.slice(1).filter(r => r.some(c => String(c).trim() !== "")).map(r => {
-      const obj = {};
-      headers.forEach((h, idx) => obj[h] = (r[idx] ?? "").trim());
-      return obj;
-    });
-  }
-
+  // تحويل أي رابط يوتيوب إلى embed
   function normalizeYouTubeUrl(url){
     if(!url) return "";
     url = url.trim();
@@ -104,511 +26,468 @@ const CupApp = (function(){
     return url;
   }
 
-  function formatScoreValue(v){
-    const s = String(v ?? "").trim();
-    if(s === "") return "";
-    if(/^[-+]?\d+(?:\.0+)?$/.test(s)){
-      return String(parseInt(s, 10));
+  // Basic CSV parser that supports quotes.
+  function parseCSV(text){
+    const rows = [];
+    let row = [];
+    let cur = "";
+    let inQuotes = false;
+    for(let i=0;i<text.length;i++){
+      const ch = text[i];
+      const next = text[i+1];
+      if(inQuotes){
+        if(ch === '"' && next === '"'){ cur += '"'; i++; continue; }
+        if(ch === '"'){ inQuotes = false; continue; }
+        cur += ch;
+      }else{
+        if(ch === '"'){ inQuotes = true; continue; }
+        if(ch === ','){ row.push(cur); cur=""; continue; }
+        if(ch === '\n'){ row.push(cur); rows.push(row); row=[]; cur=""; continue; }
+        if(ch === '\r'){ continue; }
+        cur += ch;
+      }
     }
-    return s;
+    row.push(cur);
+    rows.push(row);
+    // trim empty last line
+    if(rows.length && rows[rows.length-1].length===1 && rows[rows.length-1][0].trim()===""){
+      rows.pop();
+    }
+    const headers = rows.shift().map(h => h.trim());
+    return rows.map(r => {
+      const obj = {};
+      headers.forEach((h, idx) => obj[h] = (r[idx] ?? "").trim());
+      return obj;
+    });
   }
 
-  function formatMatchCode(code){
-    const s = String(code ?? "").trim();
-    if(!s) return "";
-    return s.replace(/^([A-Za-z]+)0+(\d+)$/i, (_, p1, p2) => `${p1.toUpperCase()}${parseInt(p2, 10)}`);
+
+  async function loadVideos(){
+    try{
+      const res = await fetch('data/videos.json?v=' + Date.now(), { cache: 'no-store' });
+      if(!res.ok) throw new Error('videos not found');
+      return await res.json();
+    }catch(e){
+      return { channel_url: 'https://www.youtube.com/@diwansports/streams', matches: {} };
+    }
   }
 
-  function getQueryParam(name){
-    const params = new URLSearchParams(location.search);
-    return params.get(name);
+  function getVideoUrl(m, videos){
+    const map = (videos && videos.matches) ? videos.matches : {};
+    const explicit = (m.video_url || map[m.match_code] || "").trim();
+    if(explicit) return normalizeYouTubeUrl(explicit);
+    return isPlayed(m) ? normalizeYouTubeUrl((videos && videos.channel_url) || 'https://www.youtube.com/@diwansports/streams') : "";
   }
 
-  function stageLabel(code){
-    const map = {
-      A:"المجموعة A",
-      B:"المجموعة B",
-      C:"المجموعة C",
-      D:"المجموعة D",
-      QF:"ربع النهائي",
-      SF:"نصف النهائي",
-      TP:"المركز الثالث والرابع",
-      F:"النهائي"
-    };
-    return map[code] || code;
+  function videoLinkHTML(m, videos, compact=false){
+    const url = getVideoUrl(m, videos);
+    if(!url) return '';
+    // فتح الفيديو داخل صفحة التفاصيل لجميع المباريات التي لها رابط فيديو
+    if(compact && m && m.match_code){
+      return `<a href="match.html?id=${encodeURIComponent(m.match_code)}&video=1">🎥 الفيديو</a>`;
+    }
+    const label = compact ? '🎥 الفيديو' : '🎥 مشاهدة المباراة على يوتيوب';
+    const cls = compact ? '' : ' class="btn" target="_blank" rel="noopener"';
+    return `<a${cls} href="${escapeHTML(url)}" target="_blank" rel="noopener">${label}</a>`;
   }
 
-  function byMatchCode(a,b){
-    const ax = (a.match_code || "").toUpperCase();
-    const bx = (b.match_code || "").toUpperCase();
-    return ax.localeCompare(bx, "en", { numeric:true });
-  }
 
   async function loadMatches(){
-    const csv = await fetchText(MATCHES_CSV);
-    const rows = parseCSV(csv);
-
-    return rows.map(m => ({
-      match_code: formatMatchCode(m.match_code || m.code || ""),
-      group: (m.group || "").toUpperCase(),
-      round: m.round || "",
-      date: m.date || "",
-      time: m.time || "",
-      team1: m.team1 || "",
-      team2: m.team2 || "",
-      score1: formatScoreValue(m.score1 || ""),
-      score2: formatScoreValue(m.score2 || ""),
-      referee1: m.referee1 || "",
-      referee2: m.referee2 || "",
-      commentator: m.commentator || "",
-      player_of_match: m.player_of_match || "",
-      goals_team1: m.goals_team1 || "",
-      goals_team2: m.goals_team2 || "",
-      var_team1: m.var_team1 || "",
-      var_team2: m.var_team2 || "",
-      yellow_team1: m.yellow_team1 || "",
-      red_team1: m.red_team1 || "",
-      yellow_team2: m.yellow_team2 || "",
-      red_team2: m.red_team2 || "",
-      var1_team: m.var1_team || "",
-      var1_type: m.var1_type || "",
-      var1_result: m.var1_result || "",
-      var2_team: m.var2_team || "",
-      var2_type: m.var2_type || "",
-      var2_result: m.var2_result || "",
-      var3_team: m.var3_team || "",
-      var3_type: m.var3_type || "",
-      var3_result: m.var3_result || "",
-      var4_team: m.var4_team || "",
-      var4_type: m.var4_type || "",
-      var4_result: m.var4_result || "",
-      scorers_team1: m.scorers_team1 || "",
-      scorers_team2: m.scorers_team2 || "",
-      var_used: m.var_used || "",
-      var_for: m.var_for || "",
-      var_type: m.var_type || "",
-      var_result: m.var_result || "",
-      pom_team: m.pom_team || "",
-      video_url: normalizeYouTubeUrl(m.video_url || "")
-    }));
-  }
-
-  async function loadStandings(){
-    const csv = await fetchText(STANDINGS_CSV);
-    return parseCSV(csv).map(r => ({
-      group: (r.group || "").toUpperCase(),
-      rank: r.rank || "",
-      team: r.team || "",
-      p: r.p || "",
-      w: r.w || "",
-      d: r.d || "",
-      l: r.l || "",
-      gf: r.gf || "",
-      ga: r.ga || "",
-      gd: r.gd || "",
-      pts: r.pts || ""
-    }));
-  }
-
-  function buildGroupStandings(matches, groupCode){
-    const teams = new Map();
-
-    function ensure(name){
-      if(!teams.has(name)){
-        teams.set(name, {
-          team:name, p:0, w:0, d:0, l:0, gf:0, ga:0, gd:0, pts:0
-        });
-      }
-      return teams.get(name);
-    }
-
-    matches.filter(m => (m.group || "").toUpperCase() === groupCode.toUpperCase()).forEach(m => {
-      const t1 = ensure(m.team1);
-      const t2 = ensure(m.team2);
-
-      const s1 = Number(m.score1 || 0);
-      const s2 = Number(m.score2 || 0);
-
-      t1.p += 1; t2.p += 1;
-      t1.gf += s1; t1.ga += s2;
-      t2.gf += s2; t2.ga += s1;
-
-      if(s1 > s2){
-        t1.w += 1; t2.l += 1;
-        t1.pts += 3;
-      } else if(s2 > s1){
-        t2.w += 1; t1.l += 1;
-        t2.pts += 3;
-      } else {
-        t1.d += 1; t2.d += 1;
-        t1.pts += 1; t2.pts += 1;
-      }
-    });
-
-    const arr = Array.from(teams.values()).map(t => ({ ...t, gd: t.gf - t.ga }));
-    arr.sort((a,b) => {
-      if(Number(b.pts) !== Number(a.pts)) return Number(b.pts) - Number(a.pts);
-      if(Number(b.gd) !== Number(a.gd)) return Number(b.gd) - Number(a.gd);
-      if(Number(b.gf) !== Number(a.gf)) return Number(b.gf) - Number(a.gf);
-      return a.team.localeCompare(b.team, "ar");
-    });
-
-    return arr.map((r, idx) => ({ rank: idx+1, ...r }));
-  }
-
-  function fillGroupTable(container, rows){
-    if(!container) return;
-    container.innerHTML = "";
-
-    if(!rows.length){
-      container.innerHTML = `
-        <tr>
-          <td colspan="10" class="muted">لا توجد فرق في هذه المجموعة حالياً.</td>
-        </tr>
-      `;
-      return;
-    }
-
-    rows.forEach(r => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${r.rank}</td>
-        <td>${r.team}</td>
-        <td>${r.p}</td>
-        <td>${r.w}</td>
-        <td>${r.d}</td>
-        <td>${r.l}</td>
-        <td>${r.gf}</td>
-        <td>${r.ga}</td>
-        <td>${r.gd}</td>
-        <td>${r.pts}</td>
-      `;
-      container.appendChild(tr);
-    });
-  }
-
-  function renderGroupMatches(container, rows){
-    if(!container) return;
-    container.innerHTML = "";
-
-    const list = rows.slice().sort(byMatchCode);
-
-    if(!list.length){
-      container.innerHTML = `<div class="muted">لا توجد مباريات مسجلة لهذه المجموعة حالياً.</div>`;
-      return;
-    }
-
-    list.forEach(m => {
-      const card = document.createElement("article");
-      card.className = "match-card";
-
-      card.innerHTML = `
-        <div class="match-card__left">
-          <a class="match-card__video" href="match.html?code=${encodeURIComponent(m.match_code)}">🎥<span>تفاصيل الفيديو</span></a>
-        </div>
-
-        <div class="match-card__center">
-          <div class="team team--away">${m.team2}</div>
-          <div class="score">${m.score1} - ${m.score2}</div>
-          <div class="team team--home">${m.team1}</div>
-        </div>
-
-        <div class="match-card__right">
-          <div class="round-badge">${m.match_code}</div>
-          <div class="date-badge">${m.date}<br>${m.time}</div>
-          <div class="meta">حكم: ${m.referee1 || "—"} / ${m.referee2 || "—"} • أفضل لاعب: ${m.player_of_match || "—"}</div>
-        </div>
-      `;
-
-      container.appendChild(card);
-    });
-  }
-
-  function renderKnockoutSection(container, title, rows){
-    if(!container) return;
-    const sec = document.createElement("section");
-    sec.className = "card";
-
-    sec.innerHTML = `
-      <div class="card-h">
-        <h2>${title}</h2>
-        <div class="badge">${rows.length}</div>
-      </div>
-      <div class="card-b">
-        <div class="matches-grid"></div>
-      </div>
-    `;
-
-    const grid = $(".matches-grid", sec);
-
-    rows.slice().sort(byMatchCode).forEach(m => {
-      const item = document.createElement("article");
-      item.className = "ko-match";
-
-      item.innerHTML = `
-        <div class="ko-meta">
-          <div class="ko-code">${m.match_code}</div>
-          <div class="ko-time">${m.time}</div>
-          <div class="ko-date">${m.date}</div>
-        </div>
-        <div class="ko-main">
-          <div class="team team--home">${m.team1}</div>
-          <div class="score">${m.score1} : ${m.score2}</div>
-          <div class="team team--away">${m.team2}</div>
-        </div>
-      `;
-
-      grid.appendChild(item);
-    });
-
-    container.appendChild(sec);
-  }
-
-  function renderStatsTable(container, rows){
-    if(!container) return;
-    container.innerHTML = "";
-
-    rows.forEach((r, idx) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td>${r.player || ""}</td>
-        <td>${r.team || ""}</td>
-        <td>${r.goals || ""}</td>
-        <td>${r.yellow || ""}</td>
-        <td>${r.red || ""}</td>
-      `;
-      container.appendChild(tr);
-    });
-  }
-
-  async function loadStats(){
-    const csv = await fetchText(STATS_CSV);
-    return parseCSV(csv);
-  }
-
-  async function loadTeams(){
-    const csv = await fetchText(TEAMS_CSV);
-    return parseCSV(csv);
-  }
-
-  async function loadPlayers(){
-    const csv = await fetchText(PLAYERS_CSV);
-    return parseCSV(csv);
-  }
-
-  async function loadAwards(){
-    const res = await fetch(AWARDS_JSON, { cache:"no-store" });
-    return await res.json();
-  }
-
-  async function loadStaff(){
-    const res = await fetch(STAFF_JSON, { cache:"no-store" });
-    return await res.json();
-  }
-
-  async function loadNews(){
     try{
-      const csv = await fetchText(NEWS_CSV);
-      return parseCSV(csv);
-    }catch(err){
+      const res = await fetch('data/matches.csv?v=' + Date.now(), { cache: 'no-store' });
+      if(!res.ok) throw new Error('لم أستطع تحميل data/matches.csv (تأكد أنه موجود في المشروع).');
+      const text = await res.text();
+      const data = parseCSV(text);
+      // normalize
+      return data.map(m => ({
+        group: (m.group || "").toUpperCase(),
+        round: m.round || "",
+        date: m.date || "",
+        time: m.time || "",
+        team1: m.team1 || "",
+        team2: m.team2 || "",
+        score1: m.score1 || "",
+        score2: m.score2 || "",
+        referee1: m.referee1 || "",
+        referee2: m.referee2 || "",
+        commentator: m.commentator || "",
+        player_of_match: m.player_of_match || "",
+        // scorers/goals (accept multiple header variants)
+        goals_team1: m.goals_team1 || m.scorers_team1 || m.scorersHome || "",
+        goals_team2: m.goals_team2 || m.scorers_team2 || m.scorersAway || "",
+        // cards (text lists)
+        yellow_team1: m.yellow_team1 || m.yellows_team1 || m.yellow1 || "",
+        red_team1: m.red_team1 || m.reds_team1 || m.red1 || "",
+        yellow_team2: m.yellow_team2 || m.yellows_team2 || m.yellow2 || "",
+        red_team2: m.red_team2 || m.reds_team2 || m.red2 || "",
+        // VAR (0-2 per team)
+        var_team1: m.var_team1 || m.var1 || "",
+        var_team2: m.var_team2 || m.var2 || "",
+        match_code: m.match_code || m.code || "",
+        video_url: m.video_url || ""
+      })).filter(m => m.group && m.match_code);
+    }catch(e){
+      showError(e.message || String(e));
       return [];
     }
   }
 
-  async function initGroup(){
-    const groupCode = (getQueryParam("g") || "A").toUpperCase();
-    const sub = $("#pageSub");
-    if(sub) sub.textContent = `المجموعة ${groupCode}`;
-
-    const matches = await loadMatches();
-    const standings = buildGroupStandings(matches, groupCode);
-    fillGroupTable($("#standings-body"), standings);
-    renderGroupMatches($("#group-matches"), matches.filter(m => (m.group || "").toUpperCase() === groupCode));
+  function isPlayed(m){
+    return m.score1 !== "" && m.score2 !== "" && !isNaN(Number(m.score1)) && !isNaN(Number(m.score2));
   }
 
-  async function initGroupsAll(){
-    const matches = await loadMatches();
-    ["A","B","C","D"].forEach(groupCode => {
-      fillGroupTable($(`#standings-${groupCode}`), buildGroupStandings(matches, groupCode));
-    });
+  function parseArabicDateToISO(dateStr){
+    // expects: "الخميس, فبراير 19, 2026" (weekday optional)
+    const s = String(dateStr||"").trim();
+    const m = s.match(/(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)\s+(\d{1,2}),\s*(\d{4})/);
+    if(!m) return "";
+    const monMap = { "يناير":"01","فبراير":"02","مارس":"03","أبريل":"04","مايو":"05","يونيو":"06","يوليو":"07","أغسطس":"08","سبتمبر":"09","أكتوبر":"10","نوفمبر":"11","ديسمبر":"12" };
+    const mm = monMap[m[1]] || "01";
+    const dd = String(m[2]).padStart(2,"0");
+    const yy = m[3];
+    return `${yy}-${mm}-${dd}`;
   }
 
-  async function initKnockout(){
-    const wrap = $("#knockout-sections");
-    if(!wrap) return;
-
-    const matches = await loadMatches();
-
-    renderKnockoutSection(wrap, "ربع النهائي", matches.filter(m => m.group === "QF"));
-    renderKnockoutSection(wrap, "نصف النهائي", matches.filter(m => m.group === "SF"));
-    renderKnockoutSection(wrap, "الثالث والرابع", matches.filter(m => m.group === "TP"));
-    renderKnockoutSection(wrap, "النهائي", matches.filter(m => m.group === "F"));
+  function matchKey(m){
+    const iso = parseArabicDateToISO(m.date);
+    const time = String(m.time||"").trim();
+    const hhmm = time && /^\d{1,2}:\d{2}$/.test(time) ? time.split(':').map((x,i)=> i===0 ? x.padStart(2,'0') : x).join('') : '0000';
+    return `${iso}T${hhmm}`;
   }
 
-  async function initMatch(){
-    const code = formatMatchCode(getQueryParam("code") || "");
-    const matches = await loadMatches();
-    const match = matches.find(m => formatMatchCode(m.match_code) === code);
+  function sortByDateTimeDesc(a,b){
+    const ka = matchKey(a);
+    const kb = matchKey(b);
+    return kb.localeCompare(ka);
+  }
 
-    if(!match){
-      const box = $("#match-view");
-      if(box) box.innerHTML = `<div class="muted">المباراة غير موجودة.</div>`;
-      return;
+  function sortByDateTimeAsc(a,b){
+    const ka = matchKey(a);
+    const kb = matchKey(b);
+    return ka.localeCompare(kb);
+  }
+
+  function isUpcoming(m){
+    if(isPlayed(m)) return false;
+    const iso = parseArabicDateToISO(m.date);
+    if(!iso) return true; // keep if date missing
+    const now = new Date();
+    const todayIso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+    // include today and after
+    return iso >= todayIso;
+  }
+
+  function computeStandings(matches, group){
+    const gMatches = matches.filter(m => m.group === group);
+    const teams = new Set();
+    gMatches.forEach(m => { teams.add(m.team1); teams.add(m.team2); });
+
+    const table = {};
+    for(const t of teams){
+      table[t] = { team:t, P:0, W:0, D:0, L:0, GF:0, GA:0, GD:0, Pts:0 };
     }
 
-    const title = $("#pageSub");
-    if(title) title.textContent = match.match_code;
+    for(const m of gMatches){
+      if(!isPlayed(m)) continue;
+      const s1 = Number(m.score1);
+      const s2 = Number(m.score2);
+      const t1 = table[m.team1] || (table[m.team1] = { team:m.team1, P:0, W:0, D:0, L:0, GF:0, GA:0, GD:0, Pts:0 });
+      const t2 = table[m.team2] || (table[m.team2] = { team:m.team2, P:0, W:0, D:0, L:0, GF:0, GA:0, GD:0, Pts:0 });
 
-    const box = $("#match-view");
-    if(!box) return;
+      t1.P++; t2.P++;
+      t1.GF += s1; t1.GA += s2;
+      t2.GF += s2; t2.GA += s1;
 
-    box.innerHTML = `
-      <section class="card">
-        <div class="card-h">
-          <h2>${stageLabel(match.group)}</h2>
-          <div class="badge">${match.match_code}</div>
-        </div>
-        <div class="card-b">
-          <div class="match-main-detail">
-            <div class="team-detail">${match.team1}</div>
-            <div class="score-large">${match.score1} : ${match.score2}</div>
-            <div class="team-detail">${match.team2}</div>
+      if(s1 > s2){ t1.W++; t2.L++; t1.Pts += 3; }
+      else if(s1 < s2){ t2.W++; t1.L++; t2.Pts += 3; }
+      else { t1.D++; t2.D++; t1.Pts += 1; t2.Pts += 1; }
+    }
+
+    for(const t of Object.values(table)){
+      t.GD = t.GF - t.GA;
+    }
+
+    const arr = Object.values(table);
+    arr.sort((a,b) => {
+      if(b.Pts !== a.Pts) return b.Pts - a.Pts;
+      if(b.GD !== a.GD) return b.GD - a.GD;
+      if(b.GF !== a.GF) return b.GF - a.GF;
+      return a.team.localeCompare(b.team, 'ar');
+    });
+    return arr;
+  }
+
+  function renderRecent(matches, videos){
+    const tbl = qs('#tblRecent tbody');
+    const badge = qs('#matchesCount');
+    if(!tbl || !badge) return;
+    const sorted = [...matches].sort(sortByDateTimeDesc);
+    badge.textContent = String(sorted.length);
+    tbl.innerHTML = sorted.map(m => {
+      const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : '—';
+      const link = m.match_code ? `<a href="match.html?id=${encodeURIComponent(m.match_code)}">عرض</a>` : '—';
+      const vlink = videoLinkHTML(m, videos, true);
+      return `<tr>
+        <td>${escapeHTML(m.match_code)}</td>
+        <td>${escapeHTML(m.group)}</td>
+        <td>${escapeHTML(m.date)}</td>
+        <td>${escapeHTML(m.time)}</td>
+        <td>${escapeHTML(m.team1)}</td>
+        <td class="score">${escapeHTML(score)}</td>
+        <td>${escapeHTML(m.team2)}</td>
+        <td>${link}${vlink ? ' &nbsp; ' + vlink : ''}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function renderStandings(standings){
+    const tbody = qs('#tblStandings tbody');
+    const badge = qs('#grpBadge');
+    if(!tbody || !badge) return;
+    badge.textContent = String(standings.length);
+    tbody.innerHTML = standings.map((t, idx) => `
+      <tr>
+        <td>${idx+1}</td>
+        <td>${escapeHTML(t.team)}</td>
+        <td>${t.P}</td>
+        <td>${t.W}</td>
+        <td>${t.D}</td>
+        <td>${t.L}</td>
+        <td>${t.GF}</td>
+        <td>${t.GA}</td>
+        <td>${t.GD}</td>
+        <td>${t.Pts}</td>
+      </tr>
+    `).join('');
+  }
+
+  function groupMatchesByRound(matches, group){
+    const g = matches.filter(m => m.group === group);
+    const map = new Map();
+    for(const m of g){
+      const r = m.round || 'مباريات';
+      if(!map.has(r)) map.set(r, []);
+      map.get(r).push(m);
+    }
+    // sort rounds by common order (الأولى/الثانية/الثالثة) else keep
+    const order = ['الجولة الأولى','الجولة الثانية','الجولة الثالثة','الجولة الرابعة'];
+    const rounds = Array.from(map.keys()).sort((a,b) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      if(ia !== -1 || ib !== -1) return (ia===-1?999:ia) - (ib===-1?999:ib);
+      return a.localeCompare(b,'ar');
+    });
+    rounds.forEach(r => map.get(r).sort((a,b) => matchKey(a).localeCompare(matchKey(b))));
+    return { rounds, map };
+  }
+
+  function renderGroupMatches(matches, group, videos){
+    const wrap = qs('#matchesByRound');
+    const badge = qs('#matchesCount');
+    if(!wrap || !badge) return;
+    const { rounds, map } = groupMatchesByRound(matches, group);
+    const all = matches.filter(m => m.group===group);
+    badge.textContent = String(all.length);
+
+    wrap.innerHTML = rounds.map(r => {
+      const ms = map.get(r) || [];
+      const items = ms.map(m => {
+        const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : '—';
+        const dt = [m.date, m.time].filter(Boolean).join(' • ');
+        const ref = [m.referee1, m.referee2].filter(Boolean).join(' / ') || '—';
+        const pom = m.player_of_match || '—';
+        const link = m.match_code ? `<a href="match.html?id=${encodeURIComponent(m.match_code)}">تفاصيل</a>` : '';
+        const vlink = videoLinkHTML(m, videos, true);
+        return `<div class="match-row">
+          <div class="pill">${escapeHTML(dt || '—')}</div>
+          <div class="dim">${escapeHTML(m.match_code || '')}</div>
+          <div>${escapeHTML(m.team1)}</div>
+          <div class="score">${escapeHTML(score)}</div>
+          <div>${escapeHTML(m.team2)}</div>
+          <div>${link}${vlink ? ' &nbsp; ' + vlink : ''}</div>
+          <div class="dim" style="grid-column: 1 / -1;">
+            حكم: ${escapeHTML(ref)} • أفضل لاعب: ${escapeHTML(pom)}
           </div>
+        </div>`;
+      }).join('');
+      return `<div class="round">
+        <div class="round-title">${escapeHTML(r)}</div>
+        ${items || '<div class="muted">لا توجد مباريات</div>'}
+      </div>`;
+    }).join('');
+  }
 
-          <div class="match-meta-detail">
-            <div><strong>التاريخ:</strong> ${match.date || "—"}</div>
-            <div><strong>الوقت:</strong> ${match.time || "—"}</div>
-            <div><strong>الحكم الأول:</strong> ${match.referee1 || "—"}</div>
-            <div><strong>الحكم الثاني:</strong> ${match.referee2 || "—"}</div>
-            <div><strong>المعلق:</strong> ${match.commentator || "—"}</div>
-            <div><strong>أفضل لاعب:</strong> ${match.player_of_match || "—"}</div>
-          </div>
+  function renderMatchPage(matches, matchCode, videos){
+    const m = matches.find(x => x.match_code === matchCode);
+    if(!m){
+      showError('لم أجد هذه المباراة. تأكد من id في الرابط.');
+      return;
+    }
+    const set = (id, val) => { const el = qs('#'+id); if(el) el.textContent = val; };
+    set('matchTitle', `${m.team1} × ${m.team2}`);
+    set('matchCode', m.match_code);
+    set('matchGroup', m.group);
+    document.body.dataset.group = m.group;
+    set('matchRound', m.round || '—');
+    set('matchDate', m.date || '—');
+    set('matchTime', m.time || '—');
 
-          <div class="detail-grid">
-            <div class="detail-box">
-              <h3>أهداف ${match.team1}</h3>
-              <p>${match.goals_team1 || match.scorers_team1 || "لا يوجد"}</p>
-            </div>
-            <div class="detail-box">
-              <h3>أهداف ${match.team2}</h3>
-              <p>${match.goals_team2 || match.scorers_team2 || "لا يوجد"}</p>
-            </div>
-            <div class="detail-box">
-              <h3>بطاقات ${match.team1}</h3>
-              <p>صفراء: ${match.yellow_team1 || "0"}<br>حمراء: ${match.red_team1 || "0"}</p>
-            </div>
-            <div class="detail-box">
-              <h3>بطاقات ${match.team2}</h3>
-              <p>صفراء: ${match.yellow_team2 || "0"}<br>حمراء: ${match.red_team2 || "0"}</p>
-            </div>
-          </div>
-        </div>
-      </section>
-    `;
+    const ref = [m.referee1, m.referee2].filter(Boolean).join(' / ') || '—';
+    set('matchRef', ref);
+    set('matchComm', m.commentator || '—');
+    set('matchPOM', m.player_of_match || '—');
+    // VAR
+    // Multi events support (var1..var4). If present, show summary and counts.
+    const varEvents = [];
+    for(let i=1;i<=4;i++){
+      const team = (m[`var${i}_team`] ?? "").trim();
+      const type = (m[`var${i}_type`] ?? "").trim();
+      const res  = (m[`var${i}_result`] ?? "").trim();
+      if(team && type && res) varEvents.push({team,type,res});
+    }
+    if(varEvents.length){
+      const typeMap = {penalty:"ضربة جزاء", goal:"هدف", red:"بطاقة حمراء", other:"أخرى"};
+      const resMap  = {awarded:"تم احتسابه", cancelled:"أُلغي", confirmed:"تأكيد قرار الحكم"};
+      const lines = varEvents.map((e,idx)=>{
+        const who = (e.team==="team1") ? m.team1 : (e.team==="team2") ? m.team2 : "—";
+        return `${idx+1}) ${who} — ${typeMap[e.type]||"—"} — ${resMap[e.res]||"—"}`;
+      });
+      const c1 = varEvents.filter(e=>e.team==="team1").length;
+      const c2 = varEvents.filter(e=>e.team==="team2").length;
+      set('matchVAR', `VAR: ${c1}/2 — ${c2}/2<br>${lines.join("<br>")}`);
+    }else if(String(m.var_used||"0")==="1"){
+      const forTeam = (m.var_for==="team1") ? m.team1 : (m.var_for==="team2") ? m.team2 : "—";
+      const typeMap = {penalty:"ضربة جزاء", goal:"هدف", red:"بطاقة حمراء", other:"أخرى"};
+      const resMap  = {awarded:"تم احتسابه", cancelled:"أُلغي", confirmed:"تأكيد قرار الحكم"};
+      const t = typeMap[m.var_type] || "—";
+      const r = resMap[m.var_result] || "—";
+      set('matchVAR', `تم استخدام VAR — لصالح: ${forTeam} — النوع: ${t} — القرار: ${r}`);
+    }else{
+      // fallback counters (0-2 per team)
+      const v1 = (m.var_team1===undefined || m.var_team1===null || m.var_team1==='') ? 0 : Number(m.var_team1);
+      const v2 = (m.var_team2===undefined || m.var_team2===null || m.var_team2==='') ? 0 : Number(m.var_team2);
+      set('matchVAR', `الفريق 1: ${isNaN(v1)?0:v1}/2 — الفريق 2: ${isNaN(v2)?0:v2}/2`);
+    }
+
+
+    const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : 'لم تُلعب بعد';
+    const scoreLine = qs('#scoreLine');
+    if(scoreLine) scoreLine.textContent = `${m.team1}  ${score}  ${m.team2}`;
+
+    const videoWrap = qs('#matchVideoWrap');
+    if(videoWrap){
+      const videoUrl = getVideoUrl(m, videos);
+      const directUrl = (videoUrl || '').replace('/embed/', '/watch?v=').replace('youtube.com/watch?v=', 'youtube.com/watch?v=');
+      const wantsVideo = getParam('video') === '1';
+      videoWrap.innerHTML = videoUrl
+        ? (
+            wantsVideo
+            ? `<div style="display:grid;gap:14px">
+                 <div style="position:relative;padding-top:56.25%;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)">
+                   <iframe
+                     src="${escapeHTML(videoUrl)}"
+                     title="فيديو المباراة"
+                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                     referrerpolicy="strict-origin-when-cross-origin"
+                     allowfullscreen
+                     style="position:absolute;inset:0;width:100%;height:100%;border:0"
+                   ></iframe>
+                 </div>
+                 <div class="btn-row">
+                   <a class="btn" href="${escapeHTML(directUrl)}" target="_blank" rel="noopener">🔗 فتح الفيديو مباشرة</a>
+                 </div>
+               </div>`
+            : `<div class="btn-row"><a class="btn" href="${escapeHTML(videoUrl)}" target="_blank" rel="noopener">🎥 مشاهدة المباراة على يوتيوب</a></div>`
+          )
+        : `<div class="muted">لا يوجد فيديو مضاف لهذه المباراة بعد.</div>`;
+    }
+
+    const back = qs('#backToGroup');
+    if(back) back.href = `group.html?g=${encodeURIComponent(m.group)}`;
+
+    const goals1 = qs('#goals1');
+    const goals2 = qs('#goals2');
+    if(goals1) goals1.innerHTML = renderGoalsList(m.goals_team1);
+    if(goals2) goals2.innerHTML = renderGoalsList(m.goals_team2);
+
+    const y1 = qs('#yellows1');
+    const r1 = qs('#reds1');
+    const y2 = qs('#yellows2');
+    const r2 = qs('#reds2');
+    if(y1) y1.innerHTML = renderGoalsList(m.yellow_team1);
+    if(r1) r1.innerHTML = renderGoalsList(m.red_team1);
+    if(y2) y2.innerHTML = renderGoalsList(m.yellow_team2);
+    if(r2) r2.innerHTML = renderGoalsList(m.red_team2);
+  }
+
+  function renderGoalsList(text){
+    const s = (text || '').trim();
+    if(!s) return '<li class="muted">—</li>';
+    // split by ; or newline
+    const parts = s.split(/;|\n|,|،|\||\/+/).map(x => x.trim()).filter(Boolean);
+    return parts.map(p => `<li>${escapeHTML(formatGoalItem(p))}</li>`).join('');
+  }
+
+
+  function formatGoalItem(p){
+    const t = String(p||'').trim();
+    if(!t) return '';
+    // normalize common minute notations: "Name 12" -> "Name (12')"
+    const m = t.match(/^(.*?)(?:\s*[\-:()]*\s*)(\d{1,3})(?:\s*['’]|\s*د|\s*min)?\s*$/);
+    if(m && m[1] && m[2]){
+      const name = m[1].trim().replace(/[\-:()]+$/,'').trim();
+      const minute = m[2].trim();
+      if(name) return `${name} (${minute}')`;
+    }
+    return t;
+  }
+
+  function escapeHTML(str){
+    return String(str ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#39;');
   }
 
   async function initIndex(){
-    const news = await loadNews();
-    const box = $("#news-list");
-    if(box && news.length){
-      box.innerHTML = "";
-      news.forEach(item => {
-        const row = document.createElement("div");
-        row.className = "news-row";
-        row.innerHTML = `
-          <div class="news-cover"><div class="news-date-badge">${item.date || ""}</div></div>
-          <div class="news-info">
-            <h3>${item.title || ""}</h3>
-            <p>${item.summary || ""}</p>
-          </div>
-          <a class="btn-home" href="${item.link || "#"}">قراءة النشرة</a>
-        `;
-        box.appendChild(row);
-      });
-    }
+    const [matches, videos] = await Promise.all([loadMatches(), loadVideos()]);
+    renderRecent(matches, videos);
   }
 
-  async function initStats(){
-    const rows = await loadStats();
-    renderStatsTable($("#stats-body"), rows);
+  async function initGroup(){
+    const g = (getParam('g') || 'A').toUpperCase();
+    const sub = qs('#pageSub'); if(sub) sub.textContent = `المجموعة ${g}`;
+    const title = qs('#grpTitle'); if(title) title.textContent = `الترتيب — المجموعة ${g}`;
+    const [matches, videos] = await Promise.all([loadMatches(), loadVideos()]);
+    const standings = computeStandings(matches, g);
+    renderStandings(standings);
+    renderGroupMatches(matches, g, videos);
   }
 
-  async function initAwards(){
-    const awards = await loadAwards();
-    const box = $("#awards-view");
-    if(!box) return;
-    box.innerHTML = "";
-    (awards || []).forEach(a => {
-      const card = document.createElement("article");
-      card.className = "award-card";
-      card.innerHTML = `
-        <h3>${a.title || ""}</h3>
-        <p>${a.player || ""}</p>
-        <div class="muted">${a.team || ""}</div>
-      `;
-      box.appendChild(card);
-    });
+  
+  async function initStage(stageCode, titleText){
+    const code = String(stageCode || "").toUpperCase();
+    const sub = qs('#pageSub'); if(sub) sub.textContent = titleText || code;
+    const title = qs('#stageTitle'); if(title) title.textContent = titleText || code;
+    const [matches, videos] = await Promise.all([loadMatches(), loadVideos()]);
+    // stage matches are those whose group equals stageCode (e.g., QF/SF/TP/F)
+    const stageMatches = matches.filter(m => (m.group||"").toUpperCase() === code);
+    const cnt = qs('#matchesCount'); if(cnt) cnt.textContent = String(stageMatches.length);
+    renderGroupMatches(stageMatches, code, videos); // renders into #matchesByRound
   }
 
-  async function initTeams(){
-    const rows = await loadTeams();
-    const box = $("#teams-grid");
-    if(!box) return;
-    box.innerHTML = "";
-    rows.forEach(r => {
-      const card = document.createElement("article");
-      card.className = "team-card";
-      card.innerHTML = `
-        <h3>${r.name || ""}</h3>
-        <div class="muted">${r.group || ""}</div>
-      `;
-      box.appendChild(card);
-    });
+  async function initKnockout(){
+    // Nothing dynamic; page is static links
+    return;
   }
 
-  async function initPlayers(){
-    const rows = await loadPlayers();
-    const box = $("#players-grid");
-    if(!box) return;
-    box.innerHTML = "";
-    rows.forEach(r => {
-      const card = document.createElement("article");
-      card.className = "player-card";
-      card.innerHTML = `
-        <h3>${r.name || ""}</h3>
-        <div class="muted">${r.team || ""}</div>
-      `;
-      box.appendChild(card);
-    });
+  async function initMatch(){
+    const id = getParam('id');
+    const [matches, videos] = await Promise.all([loadMatches(), loadVideos()]);
+    renderMatchPage(matches, id, videos);
   }
 
-  async function initStaff(){
-    const rows = await loadStaff();
-    const box = $("#staff-grid");
-    if(!box) return;
-    box.innerHTML = "";
-    (rows || []).forEach(r => {
-      const card = document.createElement("article");
-      card.className = "staff-card";
-      card.innerHTML = `
-        <h3>${r.name || ""}</h3>
-        <div class="muted">${r.role || ""}</div>
-      `;
-      box.appendChild(card);
-    });
-  }
-
-  return {
-    initIndex,
-    initGroup,
-    initGroupsAll,
-    initKnockout,
-    initMatch,
-    initStats,
-    initAwards,
-    initTeams,
-    initPlayers,
-    initStaff
-  };
+  return { initIndex, initGroup, initMatch, initStage, initKnockout };
 })();
