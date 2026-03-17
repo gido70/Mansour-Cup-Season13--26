@@ -179,10 +179,164 @@
         left: 8px;
       }
     }
+
+    /* ===== دمج صفحة الجوائز مع سيمة الموقع ===== */
+    .site-header{
+      width: min(1100px, 92vw);
+      margin: 0 auto 16px;
+      padding-top: 10px;
+    }
+
+    .header-inner{
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .site-title{
+      margin: 0 auto;
+      color: #e8f1ff;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-size: clamp(1.05rem, 2.1vw, 1.55rem);
+      font-weight: 800;
+      line-height: 1.28;
+      letter-spacing: 0;
+      text-align: center;
+      text-shadow: 0 2px 12px rgba(0,0,0,.28);
+      max-width: 92%;
+    }
+
+    .site-header .nav{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+
+    .site-header .nav-link{
+      padding:8px 14px;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:999px;
+      color:#b8c7dd;
+      font-weight:700;
+      font-size:13px;
+      background: transparent;
+    }
+
+    .site-header .nav-link:hover,
+    .site-header .nav-link[aria-current="page"]{
+      color:#e8f1ff;
+      border-color:rgba(74,163,255,.45);
+      background:rgba(74,163,255,.10);
+    }
+
+    .awards-page{
+      min-height: 100vh;
+      padding: 10px 18px 40px;
+      box-sizing: border-box;
+    }
+
+    .awards-head{
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .awards-title{
+      color: #fff;
+      font-family: system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+      font-size: clamp(1.35rem, 2.6vw, 2rem);
+      font-weight: 800;
+      line-height: 1.25;
+      margin: 0 0 8px;
+      text-shadow: 0 2px 12px rgba(0,0,0,.30);
+      max-width: 980px;
+      margin-inline: auto;
+    }
+
+    .awards-subtitle{
+      color: rgba(255,255,255,.82);
+      font-size: .98rem;
+      margin: 0;
+      text-align:center;
+    }
+
+    .site-footer{
+      width: min(1100px, 92vw);
+      margin: 18px auto 0;
+      border-top: 1px solid rgba(255,255,255,.10);
+    }
+
+    .footer-inner{
+      color: #b8c7dd;
+      padding: 14px 16px 22px;
+      text-align: center;
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px){
+      .site-title{
+        font-size: 1.05rem;
+        line-height: 1.28;
+      }
+
+      .awards-title{
+        font-size: 1.05rem;
+        line-height: 1.35;
+        max-width: 92%;
+      }
+
+      .awards-subtitle{
+        font-size: .92rem;
+      }
+    }
+
+    @media (max-width: 640px){
+      .site-header{
+        width: min(96vw, 1100px);
+        margin-bottom: 12px;
+      }
+
+      .site-title{
+        font-size: .92rem;
+        line-height: 1.3;
+        max-width: 88%;
+      }
+
+      .site-header .nav{
+        gap:8px;
+      }
+
+      .site-header .nav-link{
+        font-size:12px;
+        padding:7px 12px;
+      }
+
+      .awards-page{
+        padding: 8px 10px 28px;
+      }
+
+      .awards-head{
+        margin-bottom: 14px;
+      }
+
+      .awards-title{
+        font-size: .95rem;
+        line-height: 1.4;
+        margin-bottom: 8px;
+      }
+
+      .awards-subtitle{
+        font-size: .85rem;
+      }
+
+      .awards-note{
+        font-size: .88rem;
+      }
+    }
+
   </style>
 </head>
 
-<body>
+<body class="awards-page" data-page="awards">
   <header class="site-header">
     <div class="header-inner">
       <h1 class="site-title">بطولة كأس منصور بن زايد 2026</h1>
@@ -195,7 +349,7 @@
       <a class="nav-link" href="group.html?g=C">المجموعة C</a>
       <a class="nav-link" href="group.html?g=D">المجموعة D</a>
       <a class="nav-link" href="groups_all.html">ترتيب جميع المجموعات</a>
-      <a class="nav-link" href="awards.html">الجوائز الفردية</a>
+      <a class="nav-link" href="awards.html" aria-current="page">الجوائز الفردية</a>
       <a class="nav-link" href="stats.html">الإحصائيات</a>
       <a class="nav-link" href="knockout.html">الأدوار النهائية</a>
     </nav>
