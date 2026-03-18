@@ -16,23 +16,6 @@ const CupApp = (() => {
     el.classList.remove('hidden');
   }
 
-  function cleanText(val){
-    return String(val ?? "").trim();
-  }
-
-  function cleanScore(val){
-    const s = cleanText(val);
-    if(s === "") return "";
-    const n = Number(s);
-    return Number.isFinite(n) ? String(n) : s;
-  }
-
-  function cleanMatchCode(val){
-    let s = cleanText(val).toUpperCase();
-    s = s.replace(/^([A-Z]+)0+(\d+)$/i, '$1$2');
-    return s;
-  }
-
   // تحويل أي رابط يوتيوب إلى embed
   function normalizeYouTubeUrl(url){
     if(!url) return "";
@@ -117,48 +100,31 @@ const CupApp = (() => {
       const data = parseCSV(text);
       // normalize
       return data.map(m => ({
-        group: cleanText(m.group || "").toUpperCase(),
-        round: cleanText(m.round || ""),
-        date: cleanText(m.date || ""),
-        time: cleanText(m.time || ""),
-        team1: cleanText(m.team1 || ""),
-        team2: cleanText(m.team2 || ""),
-        score1: cleanScore(m.score1 || ""),
-        score2: cleanScore(m.score2 || ""),
-        referee1: cleanText(m.referee1 || ""),
-        referee2: cleanText(m.referee2 || ""),
-        commentator: cleanText(m.commentator || ""),
-        player_of_match: cleanText(m.player_of_match || ""),
+        group: (m.group || "").toUpperCase(),
+        round: m.round || "",
+        date: m.date || "",
+        time: m.time || "",
+        team1: m.team1 || "",
+        team2: m.team2 || "",
+        score1: m.score1 || "",
+        score2: m.score2 || "",
+        referee1: m.referee1 || "",
+        referee2: m.referee2 || "",
+        commentator: m.commentator || "",
+        player_of_match: m.player_of_match || "",
         // scorers/goals (accept multiple header variants)
-        goals_team1: cleanText(m.goals_team1 || m.scorers_team1 || m.scorersHome || ""),
-        goals_team2: cleanText(m.goals_team2 || m.scorers_team2 || m.scorersAway || ""),
+        goals_team1: m.goals_team1 || m.scorers_team1 || m.scorersHome || "",
+        goals_team2: m.goals_team2 || m.scorers_team2 || m.scorersAway || "",
         // cards (text lists)
-        yellow_team1: cleanText(m.yellow_team1 || m.yellows_team1 || m.yellow1 || ""),
-        red_team1: cleanText(m.red_team1 || m.reds_team1 || m.red1 || ""),
-        yellow_team2: cleanText(m.yellow_team2 || m.yellows_team2 || m.yellow2 || ""),
-        red_team2: cleanText(m.red_team2 || m.reds_team2 || m.red2 || ""),
+        yellow_team1: m.yellow_team1 || m.yellows_team1 || m.yellow1 || "",
+        red_team1: m.red_team1 || m.reds_team1 || m.red1 || "",
+        yellow_team2: m.yellow_team2 || m.yellows_team2 || m.yellow2 || "",
+        red_team2: m.red_team2 || m.reds_team2 || m.red2 || "",
         // VAR (0-2 per team)
-        var_team1: cleanScore(m.var_team1 || m.var1 || ""),
-        var_team2: cleanScore(m.var_team2 || m.var2 || ""),
-        match_code: cleanMatchCode(m.match_code || m.code || ""),
-        video_url: cleanText(m.video_url || ""),
-        // VAR expanded fields
-        var1_team: cleanText(m.var1_team || ""),
-        var1_type: cleanText(m.var1_type || ""),
-        var1_result: cleanText(m.var1_result || ""),
-        var2_team: cleanText(m.var2_team || ""),
-        var2_type: cleanText(m.var2_type || ""),
-        var2_result: cleanText(m.var2_result || ""),
-        var3_team: cleanText(m.var3_team || ""),
-        var3_type: cleanText(m.var3_type || ""),
-        var3_result: cleanText(m.var3_result || ""),
-        var4_team: cleanText(m.var4_team || ""),
-        var4_type: cleanText(m.var4_type || ""),
-        var4_result: cleanText(m.var4_result || ""),
-        var_used: cleanScore(m.var_used || ""),
-        var_for: cleanText(m.var_for || ""),
-        var_type: cleanText(m.var_type || ""),
-        var_result: cleanText(m.var_result || "")
+        var_team1: m.var_team1 || m.var1 || "",
+        var_team2: m.var_team2 || m.var2 || "",
+        match_code: m.match_code || m.code || "",
+        video_url: m.video_url || ""
       })).filter(m => m.group && m.match_code);
     }catch(e){
       showError(e.message || String(e));
@@ -258,7 +224,7 @@ const CupApp = (() => {
     const sorted = [...matches].sort(sortByDateTimeDesc);
     badge.textContent = String(sorted.length);
     tbl.innerHTML = sorted.map(m => {
-      const score = isPlayed(m) ? `${Number(m.score1)} - ${Number(m.score2)}` : '—';
+      const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : '—';
       const link = m.match_code ? `<a href="match.html?id=${encodeURIComponent(m.match_code)}">عرض</a>` : '—';
       const vlink = videoLinkHTML(m, videos, true);
       return `<tr>
@@ -326,7 +292,7 @@ const CupApp = (() => {
     wrap.innerHTML = rounds.map(r => {
       const ms = map.get(r) || [];
       const items = ms.map(m => {
-        const score = isPlayed(m) ? `${Number(m.score1)} - ${Number(m.score2)}` : '—';
+        const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : '—';
         const dt = [m.date, m.time].filter(Boolean).join(' • ');
         const ref = [m.referee1, m.referee2].filter(Boolean).join(' / ') || '—';
         const pom = m.player_of_match || '—';
@@ -404,7 +370,7 @@ const CupApp = (() => {
     }
 
 
-    const score = isPlayed(m) ? `${Number(m.score1)} - ${Number(m.score2)}` : 'لم تُلعب بعد';
+    const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : 'لم تُلعب بعد';
     const scoreLine = qs('#scoreLine');
     if(scoreLine) scoreLine.textContent = `${m.team1}  ${score}  ${m.team2}`;
 
@@ -518,7 +484,7 @@ const CupApp = (() => {
   }
 
   async function initMatch(){
-    const id = cleanMatchCode(getParam('id'));
+    const id = getParam('id');
     const [matches, videos] = await Promise.all([loadMatches(), loadVideos()]);
     renderMatchPage(matches, id, videos);
   }
